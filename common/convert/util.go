@@ -321,3 +321,13 @@ func VerifyMethod(cipher, password string) (err error) {
 	_, err = shadowimpl.FetchMethod(cipher, password, time.Now)
 	return
 }
+
+// bytesToLatin1String maps every byte of s to the codepoint of the same value
+// (U+0000-U+00FF), the representation expected by the ss `prefix` options.
+func bytesToLatin1String(s string) string {
+	runes := make([]rune, len(s))
+	for i := 0; i < len(s); i++ {
+		runes[i] = rune(s[i])
+	}
+	return string(runes)
+}
