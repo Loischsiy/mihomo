@@ -453,6 +453,13 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			if query.Get("udp-over-tcp") == "true" || query.Get("uot") == "1" {
 				ss["udp-over-tcp"] = true
 			}
+			// Outline salt prefixes: percent-decoded raw bytes, one codepoint (U+0000-U+00FF) per byte
+			if prefix := query.Get("prefix"); prefix != "" {
+				ss["prefix"] = bytesToLatin1String(prefix)
+			}
+			if udpPrefix := query.Get("udp-prefix"); udpPrefix != "" {
+				ss["udp-prefix"] = bytesToLatin1String(udpPrefix)
+			}
 			plugin := query.Get("plugin")
 			if strings.Contains(plugin, ";") {
 				pluginInfo, _ := url.ParseQuery("pluginName=" + strings.ReplaceAll(plugin, ";", "&"))
