@@ -2,9 +2,11 @@ package outbound
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	N "github.com/metacubex/mihomo/common/net"
 	"github.com/metacubex/mihomo/common/structure"
@@ -53,6 +55,8 @@ type ShadowSocksOption struct {
 	UDPOverTCP        bool           `proxy:"udp-over-tcp,omitempty"`
 	UDPOverTCPVersion int            `proxy:"udp-over-tcp-version,omitempty"`
 	ClientFingerprint string         `proxy:"client-fingerprint,omitempty"`
+	Prefix            string         `proxy:"prefix,omitempty"`
+	UDPPrefix         string         `proxy:"udp-prefix,omitempty"`
 }
 
 type simpleObfsOption struct {
@@ -298,11 +302,44 @@ func (ss *ShadowSocks) Close() error {
 	return nil
 }
 
+// decodeOutlinePrefix decodes an Outline-style salt prefix: every character
+// of s is a codepoint in U+0000-U+00FF and maps to exactly one prefix byte.
+func decodeOutlinePrefix(s string) ([]byte, error) {
+	if s == "" {
+		return nil, nil
+	}
+	prefix := make([]byte, 0, len(s))
+	for _, r := range s {
+		if r > 0xFF {
+			return nil, errors.New("invalid prefix: characters must be in U+0000-U+00FF")
+		}
+		prefix = append(prefix, byte(r))
+	}
+	return prefix, nil
+}
+
 func NewShadowSocks(option ShadowSocksOption) (*ShadowSocks, error) {
 	addr := net.JoinHostPort(option.Server, strconv.Itoa(option.Port))
+
+	var tcpPrefix, udpPrefix []byte
+	if option.Prefix != "" || option.UDPPrefix != "" {
+		if strings.HasPrefix(strings.ToLower(option.Cipher), "2022-blake3-") {
+			return nil, fmt.Errorf("ss %s: prefix is only supported for AEAD ciphers, not %s", addr, option.Cipher)
+		}
+		var err error
+		if tcpPrefix, err = decodeOutlinePrefix(option.Prefix); err != nil {
+			return nil, fmt.Errorf("ss %s prefix: %w", addr, err)
+		}
+		if udpPrefix, err = decodeOutlinePrefix(option.UDPPrefix); err != nil {
+			return nil, fmt.Errorf("ss %s udp-prefix: %w", addr, err)
+		}
+	}
+
 	method, err := shadowsocks.CreateMethod(option.Cipher, shadowsocks.MethodOptions{
-		Password: option.Password,
-		TimeFunc: ntp.Now,
+		Password:      option.Password,
+		TimeFunc:      ntp.Now,
+		PrefixSalt:    tcpPrefix,
+		PrefixSaltUDP: udpPrefix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ss %s cipher: %s initialize error: %w", addr, option.Cipher, err)

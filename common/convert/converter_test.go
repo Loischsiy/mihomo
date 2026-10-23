@@ -329,3 +329,34 @@ func TestConvertsV2RayVmessBase64HTTPRemappedToH2Transport(t *testing.T) {
 	_, err = adapter.ParseProxy(proxies[0])
 	assert.NoError(t, err)
 }
+
+func TestConvertsV2RaySSPrefix(t *testing.T) {
+	userInfo := base64.RawURLEncoding.EncodeToString([]byte("chacha20-ietf-poly1305:password"))
+
+	// Outline links only carry `prefix`; bytes are percent-decoded and mapped to U+0000-U+00FF
+	proxies, err := ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?prefix=POST%20%16%03%F0#outline"))
+	assert.NoError(t, err)
+	assert.Len(t, proxies, 1)
+	assert.Equal(t, "POST \u0016\u0003\u00f0", proxies[0]["prefix"])
+	assert.NotContains(t, proxies[0], "udp-prefix")
+
+	proxies, err = ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?prefix=POST%20&udp-prefix=k%7B%01%20#both"))
+	assert.NoError(t, err)
+	assert.Len(t, proxies, 1)
+	assert.Equal(t, "POST ", proxies[0]["prefix"])
+	assert.Equal(t, "k{\u0001 ", proxies[0]["udp-prefix"])
+
+	proxies, err = ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388#plain"))
+	assert.NoError(t, err)
+	assert.Len(t, proxies, 1)
+	assert.NotContains(t, proxies[0], "prefix")
+}
+
+func TestConvertsV2RaySSPrefixParseProxy(t *testing.T) {
+	userInfo := base64.RawURLEncoding.EncodeToString([]byte("chacha20-ietf-poly1305:password"))
+	proxies, err := ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?prefix=POST%20&udp-prefix=k%7B%01%20#both"))
+	assert.NoError(t, err)
+	assert.Len(t, proxies, 1)
+	_, err = adapter.ParseProxy(proxies[0])
+	assert.NoError(t, err)
+}
