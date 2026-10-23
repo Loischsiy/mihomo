@@ -1,8 +1,11 @@
 package outbound
 
 import (
+	"io"
+	"net"
 	"testing"
 
+	M "github.com/metacubex/sing/common/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,4 +99,45 @@ func TestNewShadowSocksPrefix(t *testing.T) {
 		_, err := NewShadowSocks(opt)
 		require.NoError(t, err)
 	})
+}
+
+func TestNewShadowSocksPrefixOnWire(t *testing.T) {
+	const tcpPrefix, udpPrefix = "POST ", "k{\u0001 "
+	ss, err := NewShadowSocks(ShadowSocksOption{
+		Server:    "127.0.0.1",
+		Port:      8388,
+		Password:  "password",
+		Cipher:    "chacha20-ietf-poly1305",
+		Prefix:    tcpPrefix,
+		UDPPrefix: udpPrefix,
+	})
+	require.NoError(t, err)
+
+	captureSalt := func(write func(net.Conn)) []byte {
+		client, server := net.Pipe()
+		t.Cleanup(func() { _ = client.Close() })
+		t.Cleanup(func() { _ = server.Close() })
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			write(client)
+		}()
+
+		salt := make([]byte, 32)
+		_, err := io.ReadFull(server, salt)
+		_ = server.Close()
+		<-done
+		require.NoError(t, err)
+		return salt
+	}
+
+	tcpSalt := captureSalt(func(conn net.Conn) {
+		_, _ = ss.method.DialEarlyConn(conn, M.ParseSocksaddr("example.com:80")).Write([]byte("test"))
+	})
+	assert.Equal(t, tcpPrefix, string(tcpSalt[:len(tcpPrefix)]))
+
+	udpSalt := captureSalt(func(conn net.Conn) {
+		_, _ = ss.method.DialPacketConn(conn).WriteTo([]byte("test"), &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 53})
+	})
+	assert.Equal(t, udpPrefix, string(udpSalt[:len(udpPrefix)]))
 }
