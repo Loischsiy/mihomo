@@ -39,6 +39,8 @@ type proxyProviderSchema struct {
 	Payload       []map[string]any `provider:"payload,omitempty"`
 	AgeSecretKey  string           `provider:"age-secret-key,omitempty"`
 
+	MeowClashExternal bool `provider:"meowclash-external,omitempty"`
+
 	HealthCheck healthCheckSchema   `provider:"health-check,omitempty"`
 	Override    overrideSchema      `provider:"override,omitempty"`
 	Header      map[string][]string `provider:"header,omitempty"`
@@ -91,7 +93,12 @@ func ParseProxyProvider(name string, mapping map[string]any, tunnel C.Tunnel) (P
 				return nil, C.Path.ErrNotSafePath(path)
 			}
 		}
-		vehicle = resource.NewHTTPVehicle(schema.URL, path, schema.Proxy, schema.Header, resource.DefaultHttpTimeout, schema.SizeLimit)
+		if schema.MeowClashExternal {
+			// provider is updated by the app; the core never touches the network
+			vehicle = resource.NewFileVehicle(path).MarkExternal()
+		} else {
+			vehicle = resource.NewHTTPVehicle(schema.URL, path, schema.Proxy, schema.Header, resource.DefaultHttpTimeout, schema.SizeLimit)
+		}
 	case "inline":
 		return NewInlineProvider(name, schema.Payload, parser, hc)
 	default:

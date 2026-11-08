@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -48,7 +49,21 @@ func safeWrite(path string, buf []byte) error {
 }
 
 type FileVehicle struct {
-	path string
+	path     string
+	external bool
+}
+
+// ErrExternalFileNotFound is returned when an externally managed provider has no cache file.
+var ErrExternalFileNotFound = errors.New("external provider file not found")
+
+// MarkExternal marks the file as owned by an external updater (never fetched by the core).
+func (f *FileVehicle) MarkExternal() *FileVehicle {
+	f.external = true
+	return f
+}
+
+func (f *FileVehicle) IsExternal() bool {
+	return f.external
 }
 
 func (f *FileVehicle) Type() P.VehicleType {
@@ -66,6 +81,9 @@ func (f *FileVehicle) Url() string {
 func (f *FileVehicle) Read(ctx context.Context, oldHash utils.HashType) (buf []byte, hash utils.HashType, err error) {
 	buf, err = os.ReadFile(f.path)
 	if err != nil {
+		if f.external && errors.Is(err, os.ErrNotExist) {
+			err = fmt.Errorf("%w: %s", ErrExternalFileNotFound, f.path)
+		}
 		return
 	}
 	hash = utils.MakeHash(buf)

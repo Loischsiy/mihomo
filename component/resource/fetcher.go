@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -103,6 +104,9 @@ func (f *Fetcher[V]) Initial() (V, error) {
 	// start the pull loop even if f.Update() failed
 	err := f.startPullLoop(false)
 	if err != nil {
+		if errors.Is(updateErr, ErrExternalFileNotFound) {
+			return lo.Empty[V](), updateErr // keep the contract error instead of a watcher error
+		}
 		return lo.Empty[V](), err
 	}
 

@@ -23,6 +23,8 @@ type ruleProviderSchema struct {
 	Payload      []string            `provider:"payload,omitempty"`
 	Header       map[string][]string `provider:"header,omitempty"`
 	PathInBundle string              `provider:"path-in-bundle,omitempty"`
+
+	MeowClashExternal bool `provider:"meowclash-external,omitempty"`
 }
 
 func ParseRuleProvider(name string, mapping map[string]any, parse common.ParseRuleFunc, makeBundleFile func(pathInBundle string) resource.BundleFile) (P.RuleProvider, error) {
@@ -56,7 +58,12 @@ func ParseRuleProvider(name string, mapping map[string]any, parse common.ParseRu
 				return nil, C.Path.ErrNotSafePath(path)
 			}
 		}
-		vehicle = resource.NewHTTPVehicle(schema.URL, path, schema.Proxy, schema.Header, resource.DefaultHttpTimeout, schema.SizeLimit)
+		if schema.MeowClashExternal {
+			// provider is updated by the app; the core never touches the network
+			vehicle = resource.NewFileVehicle(path).MarkExternal()
+		} else {
+			vehicle = resource.NewHTTPVehicle(schema.URL, path, schema.Proxy, schema.Header, resource.DefaultHttpTimeout, schema.SizeLimit)
+		}
 	case "inline":
 		return NewInlineProvider(name, behavior, schema.Payload, parse), nil
 	default:
