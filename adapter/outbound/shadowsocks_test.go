@@ -112,6 +112,15 @@ func TestNewShadowSocksPrefix(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("low salt entropy warns without failing", func(t *testing.T) {
+		opt := base
+		opt.Cipher = "aes-128-gcm"
+		opt.Prefix = "POST " // 16 - 5 = 11 random bytes (< 16)
+		ss, err := NewShadowSocks(opt)
+		require.NoError(t, err)
+		assert.NotNil(t, ss)
+	})
 }
 
 func TestNewShadowSocksPrefixOnWire(t *testing.T) {

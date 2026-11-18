@@ -885,3 +885,9 @@ func (w *WireGuard) ProxyInfo() C.ProxyInfo {
 func (w *WireGuard) IsL3Protocol(metadata *C.Metadata) bool {
 	return true
 }
+
+func warnOutlinePrefixEntropy(name, field string, saltLen, prefixLen int) {
+	if prefixLen > 0 && saltLen-prefixLen < 16 {
+		log.Warnln("[SS](%s) %s leaves only %d random salt bytes (< 16), which may cause salt collisions", name, field, saltLen-prefixLen)
+	}
+}
