@@ -318,12 +318,42 @@ func decodeOutlinePrefix(s string) ([]byte, error) {
 	return prefix, nil
 }
 
+func isOutlinePrefixAEADCipher(cipher string) bool {
+	switch strings.ToLower(cipher) {
+	case "aes-128-gcm",
+		"aes-192-gcm",
+		"aes-256-gcm",
+		"chacha20-ietf-poly1305",
+		"xchacha20-ietf-poly1305",
+		"chacha8-ietf-poly1305",
+		"xchacha8-ietf-poly1305",
+		"rabbit128-poly1305",
+		"aes-128-ccm",
+		"aes-192-ccm",
+		"aes-256-ccm",
+		"aes-128-gcm-siv",
+		"aes-256-gcm-siv",
+		"aegis-128l",
+		"aegis-256",
+		"aez-384",
+		"deoxys-ii-256-128",
+		"lea-128-gcm",
+		"lea-192-gcm",
+		"lea-256-gcm",
+		"ascon128",
+		"ascon128a":
+		return true
+	default:
+		return false
+	}
+}
+
 func NewShadowSocks(option ShadowSocksOption) (*ShadowSocks, error) {
 	addr := net.JoinHostPort(option.Server, strconv.Itoa(option.Port))
 
 	var tcpPrefix, udpPrefix []byte
 	if option.Prefix != "" || option.UDPPrefix != "" {
-		if strings.HasPrefix(strings.ToLower(option.Cipher), "2022-blake3-") {
+		if !isOutlinePrefixAEADCipher(option.Cipher) {
 			return nil, fmt.Errorf("ss %s: prefix is only supported for AEAD ciphers, not %s", addr, option.Cipher)
 		}
 		var err error

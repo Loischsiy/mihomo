@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/metacubex/mihomo/common/utils"
 
@@ -330,4 +331,24 @@ func bytesToLatin1String(s string) string {
 		runes[i] = rune(s[i])
 	}
 	return string(runes)
+}
+
+// outlinePrefixString normalizes a percent-decoded Outline prefix query value
+// to a string of U+0000-U+00FF codepoints. Outline encodes each byte as a
+// UTF-8 rune in U+0000-U+00FF (e.g. %C2%A8 for 0xA8); non-standard links may
+// percent-encode raw bytes directly (e.g. %F0), which are mapped 1:1.
+func outlinePrefixString(s string) string {
+	if utf8.ValidString(s) {
+		allLatin1 := true
+		for _, r := range s {
+			if r > 0xFF {
+				allLatin1 = false
+				break
+			}
+		}
+		if allLatin1 {
+			return s
+		}
+	}
+	return bytesToLatin1String(s)
 }

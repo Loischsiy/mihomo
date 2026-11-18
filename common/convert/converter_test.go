@@ -333,12 +333,26 @@ func TestConvertsV2RayVmessBase64HTTPRemappedToH2Transport(t *testing.T) {
 func TestConvertsV2RaySSPrefix(t *testing.T) {
 	userInfo := base64.RawURLEncoding.EncodeToString([]byte("chacha20-ietf-poly1305:password"))
 
-	// Outline links only carry `prefix`; bytes are percent-decoded and mapped to U+0000-U+00FF
-	proxies, err := ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?prefix=POST%20%16%03%F0#outline"))
+	// Official Outline format: encodeURIComponent(JSON string), where 0xA8 is UTF-8 %C2%A8 (7 bytes total)
+	proxies, err := ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?outline=1&prefix=%16%03%01%00%C2%A8%01%01#outline-tls"))
+	assert.NoError(t, err)
+	assert.Len(t, proxies, 1)
+	assert.Equal(t, "\u0016\u0003\u0001\u0000\u00a8\u0001\u0001", proxies[0]["prefix"])
+	assert.NotContains(t, proxies[0], "udp-prefix")
+	_, err = adapter.ParseProxy(proxies[0])
+	assert.NoError(t, err)
+
+	// Non-standard raw percent-encoded bytes (>= 0x80) fall back to 1:1 byte-to-codepoint mapping
+	proxies, err = ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?prefix=POST%20%16%03%F0#raw-byte"))
 	assert.NoError(t, err)
 	assert.Len(t, proxies, 1)
 	assert.Equal(t, "POST \u0016\u0003\u00f0", proxies[0]["prefix"])
-	assert.NotContains(t, proxies[0], "udp-prefix")
+
+	// Valid UTF-8 sequences with codepoints > U+00FF fall back to raw byte mapping
+	proxies, err = ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?prefix=%E2%82%AC#utf8-gt-ff"))
+	assert.NoError(t, err)
+	assert.Len(t, proxies, 1)
+	assert.Equal(t, "\u00e2\u0082\u00ac", proxies[0]["prefix"])
 
 	proxies, err = ConvertsV2Ray([]byte("ss://" + userInfo + "@example.com:8388/?prefix=POST%20&udp-prefix=k%7B%01%20#both"))
 	assert.NoError(t, err)

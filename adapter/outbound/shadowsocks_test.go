@@ -99,6 +99,19 @@ func TestNewShadowSocksPrefix(t *testing.T) {
 		_, err := NewShadowSocks(opt)
 		require.NoError(t, err)
 	})
+
+	t.Run("stream and none reject prefix", func(t *testing.T) {
+		for _, cipher := range []string{"aes-256-cfb", "aes-128-ctr", "rc4-md5", "chacha20-ietf", "none"} {
+			for _, tc := range []struct{ tcp, udp string }{{"POST ", ""}, {"", "POST "}, {"POST ", "POST "}} {
+				opt := base
+				opt.Cipher = cipher
+				opt.Prefix = tc.tcp
+				opt.UDPPrefix = tc.udp
+				_, err := NewShadowSocks(opt)
+				assert.ErrorContains(t, err, "prefix is only supported for AEAD ciphers", "cipher=%s", cipher)
+			}
+		}
+	})
 }
 
 func TestNewShadowSocksPrefixOnWire(t *testing.T) {
