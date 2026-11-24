@@ -151,4 +151,4 @@ require (
 replace google.golang.org/protobuf => github.com/metacubex/protobuf-go v0.0.0-20260306035419-7ceee0674686
 
 // Outline salt-prefix support (PrefixSalt / PrefixSaltUDP); tag is frozen, never move it
-replace github.com/metacubex/sing-shadowsocks2 => github.com/Loischsiy/sing-shadowsocks2 v0.2.8-meowclash.1
+replace github.com/metacubex/sing-shadowsocks2 => github.com/Loischsiy/sing-shadowsocks2 v0.2.8-meowclash.2
